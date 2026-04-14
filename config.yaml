@@ -1,0 +1,45 @@
+# config.yaml
+# Pipeline configuration — copy this file and fill in your credentials
+# Never commit real credentials to Git — use environment variables in production
+
+sources:
+
+  sql_db:
+    dialect:   postgresql        # postgresql | mssql+pyodbc | snowflake
+    host:      YOUR_DB_HOST
+    port:      5432
+    database:  claims_db
+    user:      YOUR_DB_USER
+    password:  YOUR_DB_PASSWORD  # use env var: ${DB_PASSWORD}
+
+  aws_s3:
+    bucket:          your-claims-bucket
+    region:          us-east-1
+    prefix:          claims/raw/
+    access_key_id:   YOUR_AWS_KEY       # use env var: ${AWS_ACCESS_KEY_ID}
+    secret_access_key: YOUR_AWS_SECRET  # use env var: ${AWS_SECRET_ACCESS_KEY}
+
+  azure_blob:
+    account_name:    yourstorageaccount
+    container:       claims-raw
+    connection_str:  YOUR_AZURE_CONN_STR  # use env var: ${AZURE_STORAGE_CONN_STR}
+
+  api:
+    base_url:    https://api.yourclaims.com/v1
+    api_key:     YOUR_API_KEY   # use env var: ${API_KEY}
+    timeout_sec: 30
+
+warehouse:
+  dialect:   postgresql
+  host:      YOUR_WAREHOUSE_HOST
+  port:      5432
+  database:  claims_warehouse
+  user:      YOUR_WH_USER
+  password:  YOUR_WH_PASSWORD   # use env var: ${WH_PASSWORD}
+
+pipeline:
+  batch_size:       10000
+  log_level:        INFO
+  output_dir:       data/processed
+  export_csv:       true
+  export_parquet:   false
