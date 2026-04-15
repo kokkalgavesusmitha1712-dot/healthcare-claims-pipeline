@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Healthcare Claims Analytics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0b0f1a;
+    --surface:   #111827;
+    --surface2:  #1a2235;
+    --border:    rgba(255,255,255,0.07);
+    --text:      #f0f4ff;
+    --muted:     #8892a4;
+    --accent:    #3b82f6;
+    --green:     #10b981;
+    --red:       #ef4444;
+    --amber:     #f59e0b;
+    --purple:    #8b5cf6;
+    --teal:      #14b8a6;
+    --font:      'DM Sans', sans-serif;
+    --mono:      'DM Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 0 24px 48px; }
+
+  /* ── Header ── */
+  header {
+    padding: 32px 0 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+    animation: fadeDown 0.5s ease both;
+  }
+  .header-left {}
+  .header-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.25);
+    color: #93c5fd; font-size: 11px; font-family: var(--mono);
+    padding: 4px 10px; border-radius: 4px; margin-bottom: 10px;
+  }
+  .header-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #3b82f6; animation: pulse 2s infinite; }
+  h1 { font-size: clamp(20px, 3vw, 28px); font-weight: 600; letter-spacing: -0.5px; line-height: 1.2; }
+  h1 span { color: var(--accent); }
+  .header-sub { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .header-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .meta-pill {
+    font-size: 11px; padding: 3px 10px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted); font-family: var(--mono);
+  }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .live-badge {
+    font-size: 11px; font-family: var(--mono); color: var(--green);
+    border: 1px solid rgba(16,185,129,0.3); padding: 4px 10px; border-radius: 4px;
+    background: rgba(16,185,129,0.08);
+  }
+  .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  select {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--font); font-size: 12px; padding: 6px 10px;
+    border-radius: 6px; cursor: pointer; outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+
+  /* ── KPI Cards ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 28px;
+  }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 20px;
+    animation: fadeUp 0.4s ease both;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .kpi-card:hover { border-color: rgba(255,255,255,0.15); transform: translateY(-2px); }
+  .kpi-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; font-family: var(--mono); }
+  .kpi-value { font-size: 26px; font-weight: 600; letter-spacing: -1px; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .kpi-trend { font-size: 11px; margin-top: 4px; font-family: var(--mono); }
+  .up   { color: var(--green); }
+  .down { color: var(--red); }
+  .neu  { color: var(--muted); }
+
+  /* ── Chart grid ── */
+  .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .grid-full { margin-bottom: 16px; }
+
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px;
+    animation: fadeUp 0.5s ease both;
+  }
+  .chart-card:hover { border-color: rgba(255,255,255,0.12); }
+  .chart-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .chart-sub   { font-size: 11px; color: var(--muted); margin-bottom: 16px; font-family: var(--mono); }
+  .chart-wrap  { position: relative; }
+
+  /* ── Status table ── */
+  .table-wrap { overflow-x: auto; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); font-family: var(--mono); }
+  td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .badge { display: inline-block; font-size: 10px; font-family: var(--mono); padding: 2px 8px; border-radius: 4px; font-weight: 500; }
+  .badge-green  { background: rgba(16,185,129,0.15);  color: #34d399; }
+  .badge-red    { background: rgba(239,68,68,0.15);   color: #f87171; }
+  .badge-amber  { background: rgba(245,158,11,0.15);  color: #fbbf24; }
+  .badge-blue   { background: rgba(59,130,246,0.15);  color: #93c5fd; }
+
+  /* ── Progress bars ── */
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .bar-label { font-size: 12px; color: var(--muted); min-width: 120px; }
+  .bar-track { flex: 1; height: 6px; background: var(--surface2); border-radius: 999px; overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 999px; transition: width 1s ease; }
+  .bar-val   { font-size: 11px; font-family: var(--mono); color: var(--text); min-width: 36px; text-align: right; }
+
+  /* ── Footer ── */
+  footer {
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  .footer-left  { font-size: 12px; color: var(--muted); }
+  .footer-links { display: flex; gap: 16px; }
+  .footer-links a { font-size: 12px; color: var(--muted); text-decoration: none; font-family: var(--mono); transition: color 0.2s; }
+  .footer-links a:hover { color: var(--accent); }
+
+  /* ── Animations ── */
+  @keyframes fadeUp   { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeDown { from { opacity:0; transform:translateY(-10px);} to { opacity:1; transform:translateY(0); } }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+
+  .kpi-card:nth-child(1) { animation-delay: 0.05s; }
+  .kpi-card:nth-child(2) { animation-delay: 0.10s; }
+  .kpi-card:nth-child(3) { animation-delay: 0.15s; }
+  .kpi-card:nth-child(4) { animation-delay: 0.20s; }
+  .kpi-card:nth-child(5) { animation-delay: 0.25s; }
+  .kpi-card:nth-child(6) { animation-delay: 0.30s; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="header-left">
+      <div class="header-badge">HEALTHCARE CLAIMS ANALYTICS</div>
+      <h1>Claims <span>KPI</span> Dashboard</h1>
+      <p class="header-sub">End-to-end pipeline · Python · PySpark · Databricks · AWS S3 · Power BI</p>
+      <div class="header-meta">
+        <span class="meta-pill">500 claims</span>
+        <span class="meta-pill">Jan 2023 – Dec 2024</span>
+        <span class="meta-pill">5 regions</span>
+        <span class="meta-pill">4 plan types</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge">● LIVE DATA</div>
+      <div class="filter-row">
+        <select id="regionFilter" onchange="applyFilters()">
+          <option value="all">All Regions</option>
+          <option value="Northeast">Northeast</option>
+          <option value="Southeast">Southeast</option>
+          <option value="Midwest">Midwest</option>
+          <option value="Southwest">Southwest</option>
+          <option value="West">West</option>
+        </select>
+        <select id="planFilter" onchange="applyFilters()">
+          <option value="all">All Plans</option>
+          <option value="PPO">PPO</option>
+          <option value="HMO">HMO</option>
+          <option value="EPO">EPO</option>
+          <option value="HDHP">HDHP</option>
+        </select>
+        <select id="typeFilter" onchange="applyFilters()">
+          <option value="all">All Types</option>
+          <option value="medical">Medical</option>
+          <option value="pharmacy">Pharmacy</option>
+          <option value="dental">Dental</option>
+          <option value="vision">Vision</option>
+          <option value="behavioral">Behavioral</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── KPI Cards ── -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Claims</div>
+      <div class="kpi-value" id="kTotalClaims">—</div>
+      <div class="kpi-sub">Across all sources</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Approval Rate</div>
+      <div class="kpi-value up" id="kApprovalRate">—</div>
+      <div class="kpi-trend up" id="kApprovalTrend">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Denial Rate</div>
+      <div class="kpi-value down" id="kDenialRate">—</div>
+      <div class="kpi-trend" id="kDenialTrend">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Billed</div>
+      <div class="kpi-value" id="kTotalBilled">—</div>
+      <div class="kpi-sub">All claim types</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg Processing</div>
+      <div class="kpi-value" id="kAvgProcessing">—</div>
+      <div class="kpi-sub">Days per claim</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Payment Ratio</div>
+      <div class="kpi-value" id="kPaymentRatio">—</div>
+      <div class="kpi-sub">Paid / Billed</div>
+    </div>
+  </div>
+
+  <!-- ── Row 1: Monthly volume + Status breakdown ── -->
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Monthly claim volume</div>
+      <div class="chart-sub">Jan 2023 – Dec 2024 · all types</div>
+      <div class="chart-wrap" style="height:200px">
+        <canvas id="monthlyChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Claim status breakdown</div>
+      <div class="chart-sub">Approved · Denied · Pending · Under review</div>
+      <div class="chart-wrap" style="height:200px; display:flex; align-items:center; gap:24px;">
+        <canvas id="statusChart" style="max-width:180px; max-height:180px;"></canvas>
+        <div id="statusLegend" style="flex:1; font-size:12px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Row 2: By type + By region + Processing ── -->
+  <div class="grid-3">
+    <div class="chart-card">
+      <div class="chart-title">Approval rate by claim type</div>
+      <div class="chart-sub">% approved per type</div>
+      <div class="chart-wrap" style="height:190px">
+        <canvas id="approvalByTypeChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Claims by region</div>
+      <div class="chart-sub">Volume distribution</div>
+      <div class="chart-wrap" style="height:190px">
+        <canvas id="regionChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Processing time distribution</div>
+      <div class="chart-sub">Days to process a claim</div>
+      <div class="chart-wrap" style="height:190px">
+        <canvas id="processingChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Row 3: Financials ── -->
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Billed vs paid by claim type</div>
+      <div class="chart-sub">Average amounts per type ($)</div>
+      <div class="chart-wrap" style="height:200px">
+        <canvas id="billedPaidChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Denial reasons</div>
+      <div class="chart-sub">Top reasons for claim denial</div>
+      <div id="denialBars" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Row 4: Provider table ── -->
+  <div class="grid-full">
+    <div class="chart-card">
+      <div class="chart-title">Claims by plan type — detail view</div>
+      <div class="chart-sub">Approval rate · volume · avg paid · status</div>
+      <div class="table-wrap">
+        <table id="planTable">
+          <thead>
+            <tr>
+              <th>Plan Type</th>
+              <th>Total Claims</th>
+              <th>Approved</th>
+              <th>Denied</th>
+              <th>Approval Rate</th>
+              <th>Avg Billed</th>
+              <th>Avg Paid</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="planTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <div class="footer-left">Built by <strong>Sushmitha Kokkalgave</strong> · Healthcare Claims Analytics Pipeline</div>
+    <div class="footer-links">
+      <a href="https://github.com/sushmitha-kokkalgave/healthcare-claims-pipeline" target="_blank">GitHub →</a>
+      <a href="https://linkedin.com/in/sushmitha-kokkalgave" target="_blank">LinkedIn →</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+// ── Data generation ────────────────────────────────────────────────
+const SEED = 42;
+function seededRand(seed){ let x=Math.sin(seed)*10000; return x-Math.floor(x); }
+
+const TYPES   = ['medical','pharmacy','dental','vision','behavioral'];
+const REGIONS = ['Northeast','Southeast','Midwest','Southwest','West'];
+const PLANS   = ['PPO','HMO','EPO','HDHP'];
+const STATUS  = ['approved','denied','pending','under_review'];
+const STATUS_W= [0.70,0.18,0.08,0.04];
+const DENIAL_R= ['not covered','prior auth required','duplicate claim','out of network','exceeded benefit limit'];
+
+function weightedChoice(opts, weights, r){
+  let cum=0, arr=weights.map(w=>{cum+=w;return cum;});
+  for(let i=0;i<arr.length;i++) if(r<arr[i]) return opts[i];
+  return opts[opts.length-1];
+}
+
+const rawData = [];
+const months  = [];
+for(let y=2023;y<=2024;y++) for(let m=1;m<=12;m++) months.push(`${y}-${String(m).padStart(2,'0')}`);
+
+for(let i=0;i<500;i++){
+  const r1 = seededRand(i*7+1), r2=seededRand(i*7+2), r3=seededRand(i*7+3);
+  const r4 = seededRand(i*7+4), r5=seededRand(i*7+5), r6=seededRand(i*7+6);
+  const status = weightedChoice(STATUS, STATUS_W, r1);
+  rawData.push({
+    id:       `CLM${String(i+1).padStart(5,'0')}`,
+    type:     TYPES[Math.floor(r2*TYPES.length)],
+    region:   REGIONS[Math.floor(r3*REGIONS.length)],
+    plan:     PLANS[Math.floor(r4*PLANS.length)],
+    month:    months[Math.floor(r5*months.length)],
+    status,
+    billed:   Math.round(50 + r6*4950),
+    allowed:  Math.round(40 + seededRand(i*7+8)*4460),
+    paid:     Math.round(30 + seededRand(i*7+9)*3970),
+    days:     Math.floor(1  + seededRand(i*7+10)*19),
+    denial:   status==='denied' ? DENIAL_R[Math.floor(seededRand(i*7+11)*DENIAL_R.length)] : null,
+  });
+}
+
+// ── Chart registry ─────────────────────────────────────────────────
+const charts = {};
+function destroyChart(id){ if(charts[id]){ charts[id].destroy(); delete charts[id]; } }
+
+const COLORS = {
+  blue:'#3b82f6', green:'#10b981', red:'#ef4444',
+  amber:'#f59e0b', purple:'#8b5cf6', teal:'#14b8a6',
+  muted:'#8892a4'
+};
+const PALETTE = [COLORS.blue,COLORS.green,COLORS.amber,COLORS.purple,COLORS.teal,COLORS.red];
+
+const gridColor = 'rgba(255,255,255,0.05)';
+const textColor = '#8892a4';
+const baseOpts  = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:'#1a2235', titleColor:'#f0f4ff', bodyColor:'#8892a4', borderColor:'rgba(255,255,255,0.1)', borderWidth:1 }},
+};
+
+// ── Filter & render ───────────────────────────────────────────────
+function applyFilters(){
+  const region = document.getElementById('regionFilter').value;
+  const plan   = document.getElementById('planFilter').value;
+  const type   = document.getElementById('typeFilter').value;
+
+  const d = rawData.filter(r =>
+    (region==='all' || r.region===region) &&
+    (plan  ==='all' || r.plan  ===plan)   &&
+    (type  ==='all' || r.type  ===type)
+  );
+
+  renderKPIs(d);
+  renderMonthly(d);
+  renderStatus(d);
+  renderApprovalByType(d);
+  renderRegion(d);
+  renderProcessing(d);
+  renderBilledPaid(d);
+  renderDenialBars(d);
+  renderPlanTable(d);
+}
+
+// ── KPIs ──────────────────────────────────────────────────────────
+function renderKPIs(d){
+  const total    = d.length;
+  const approved = d.filter(r=>r.status==='approved').length;
+  const denied   = d.filter(r=>r.status==='denied').length;
+  const billed   = d.reduce((s,r)=>s+r.billed,0);
+  const paid     = d.reduce((s,r)=>s+r.paid,  0);
+  const avgDays  = d.length ? d.reduce((s,r)=>s+r.days,0)/d.length : 0;
+  const appRate  = total ? approved/total*100 : 0;
+  const denRate  = total ? denied/total*100   : 0;
+  const payRatio = billed ? paid/billed*100   : 0;
+
+  document.getElementById('kTotalClaims').textContent   = total.toLocaleString();
+  document.getElementById('kApprovalRate').textContent  = appRate.toFixed(1)+'%';
+  document.getElementById('kDenialRate').textContent    = denRate.toFixed(1)+'%';
+  document.getElementById('kTotalBilled').textContent   = '$'+Math.round(billed/1000)+'K';
+  document.getElementById('kAvgProcessing').textContent = avgDays.toFixed(1)+'d';
+  document.getElementById('kPaymentRatio').textContent  = payRatio.toFixed(1)+'%';
+  document.getElementById('kApprovalTrend').textContent = appRate>=70 ? '▲ Above target' : '▼ Below 70% target';
+  document.getElementById('kDenialTrend').textContent   = denRate<=20 ? '✓ Within range'  : '⚠ High denial rate';
+  document.getElementById('kApprovalTrend').className   = 'kpi-trend '+(appRate>=70?'up':'down');
+  document.getElementById('kDenialTrend').className     = 'kpi-trend '+(denRate<=20?'up':'down');
+}
+
+// ── Monthly volume ────────────────────────────────────────────────
+function renderMonthly(d){
+  destroyChart('monthly');
+  const counts = {};
+  months.forEach(m=>counts[m]=0);
+  d.forEach(r=>{ if(counts[r.month]!==undefined) counts[r.month]++; });
+  const labels = months.map(m=>{ const [y,mo]=m.split('-'); return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]} ${y.slice(2)}`; });
+  const values = months.map(m=>counts[m]);
+
+  charts['monthly'] = new Chart(document.getElementById('monthlyChart'),{
+    type:'bar',
+    data:{ labels, datasets:[{ data:values, backgroundColor:'rgba(59,130,246,0.7)', borderColor:'#3b82f6', borderWidth:1, borderRadius:3 }]},
+    options:{...baseOpts, scales:{
+      x:{ ticks:{ color:textColor, font:{size:9}, maxRotation:45 }, grid:{color:gridColor} },
+      y:{ ticks:{ color:textColor, font:{size:10} }, grid:{color:gridColor} }
+    }}
+  });
+}
+
+// ── Status donut ──────────────────────────────────────────────────
+function renderStatus(d){
+  destroyChart('status');
+  const counts = {approved:0,denied:0,pending:0,under_review:0};
+  d.forEach(r=>counts[r.status]=(counts[r.status]||0)+1);
+  const labels = ['Approved','Denied','Pending','Under Review'];
+  const values = [counts.approved,counts.denied,counts.pending,counts.under_review];
+  const colors = [COLORS.green,COLORS.red,COLORS.amber,COLORS.blue];
+  const total  = d.length;
+
+  charts['status'] = new Chart(document.getElementById('statusChart'),{
+    type:'doughnut',
+    data:{ labels, datasets:[{ data:values, backgroundColor:colors, borderWidth:2, borderColor:'#111827', hoverOffset:4 }]},
+    options:{...baseOpts, cutout:'72%', plugins:{...baseOpts.plugins, legend:{display:false}}}
+  });
+
+  document.getElementById('statusLegend').innerHTML = labels.map((l,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <span style="width:10px;height:10px;border-radius:2px;background:${colors[i]};flex-shrink:0;"></span>
+      <span style="color:#8892a4;flex:1;">${l}</span>
+      <span style="font-family:var(--mono);font-size:11px;">${values[i]} <span style="color:#8892a4;">(${total?((values[i]/total)*100).toFixed(0):0}%)</span></span>
+    </div>`).join('');
+}
+
+// ── Approval by type ──────────────────────────────────────────────
+function renderApprovalByType(d){
+  destroyChart('approvalByType');
+  const typeMap={};
+  TYPES.forEach(t=>typeMap[t]={total:0,approved:0});
+  d.forEach(r=>{ if(typeMap[r.type]){ typeMap[r.type].total++; if(r.status==='approved') typeMap[r.type].approved++; }});
+  const labels = TYPES.map(t=>t.charAt(0).toUpperCase()+t.slice(1));
+  const rates  = TYPES.map(t=> typeMap[t].total ? +(typeMap[t].approved/typeMap[t].total*100).toFixed(1):0);
+  const bgColors = rates.map(r=> r>=75?'rgba(16,185,129,0.7)': r>=65?'rgba(245,158,11,0.7)':'rgba(239,68,68,0.7)');
+
+  charts['approvalByType'] = new Chart(document.getElementById('approvalByTypeChart'),{
+    type:'bar',
+    data:{ labels, datasets:[{ data:rates, backgroundColor:bgColors, borderRadius:4, borderWidth:0 }]},
+    options:{...baseOpts, scales:{
+      x:{ ticks:{color:textColor,font:{size:10}}, grid:{color:gridColor} },
+      y:{ min:0, max:100, ticks:{color:textColor,font:{size:10},callback:v=>v+'%'}, grid:{color:gridColor} }
+    }, plugins:{...baseOpts.plugins, tooltip:{...baseOpts.plugins.tooltip, callbacks:{label:ctx=>` ${ctx.raw}% approval rate`}}}}
+  });
+}
+
+// ── Region chart ──────────────────────────────────────────────────
+function renderRegion(d){
+  destroyChart('region');
+  const counts={};
+  REGIONS.forEach(r=>counts[r]=0);
+  d.forEach(r=>counts[r.region]=(counts[r.region]||0)+1);
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+
+  charts['region'] = new Chart(document.getElementById('regionChart'),{
+    type:'bar',
+    data:{ labels:sorted.map(s=>s[0]), datasets:[{ data:sorted.map(s=>s[1]), backgroundColor:PALETTE, borderRadius:4, borderWidth:0 }]},
+    options:{...baseOpts, indexAxis:'y', scales:{
+      x:{ ticks:{color:textColor,font:{size:10}}, grid:{color:gridColor} },
+      y:{ ticks:{color:textColor,font:{size:10}}, grid:{display:false} }
+    }}
+  });
+}
+
+// ── Processing histogram ──────────────────────────────────────────
+function renderProcessing(d){
+  destroyChart('processing');
+  const bins = Array(10).fill(0);
+  d.forEach(r=>{ const b=Math.min(Math.floor((r.days-1)/2),9); bins[b]++; });
+  const labels = Array.from({length:10},(_,i)=>`${i*2+1}-${i*2+2}d`);
+
+  charts['processing'] = new Chart(document.getElementById('processingChart'),{
+    type:'bar',
+    data:{ labels, datasets:[{ data:bins, backgroundColor:'rgba(139,92,246,0.7)', borderColor:'#8b5cf6', borderWidth:1, borderRadius:3 }]},
+    options:{...baseOpts, scales:{
+      x:{ ticks:{color:textColor,font:{size:9}}, grid:{color:gridColor} },
+      y:{ ticks:{color:textColor,font:{size:10}}, grid:{color:gridColor} }
+    }}
+  });
+}
+
+// ── Billed vs Paid ────────────────────────────────────────────────
+function renderBilledPaid(d){
+  destroyChart('billedPaid');
+  const typeMap={};
+  TYPES.forEach(t=>typeMap[t]={billed:[],paid:[]});
+  d.forEach(r=>{ if(typeMap[r.type]){ typeMap[r.type].billed.push(r.billed); typeMap[r.type].paid.push(r.paid); }});
+  const avgB = TYPES.map(t=> typeMap[t].billed.length ? Math.round(typeMap[t].billed.reduce((a,b)=>a+b,0)/typeMap[t].billed.length):0);
+  const avgP = TYPES.map(t=> typeMap[t].paid.length   ? Math.round(typeMap[t].paid.reduce((a,b)=>a+b,0)/typeMap[t].paid.length):0);
+  const labels = TYPES.map(t=>t.charAt(0).toUpperCase()+t.slice(1));
+
+  charts['billedPaid'] = new Chart(document.getElementById('billedPaidChart'),{
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Avg Billed', data:avgB, backgroundColor:'rgba(239,68,68,0.7)',  borderRadius:3, borderWidth:0 },
+      { label:'Avg Paid',   data:avgP, backgroundColor:'rgba(16,185,129,0.7)', borderRadius:3, borderWidth:0 },
+    ]},
+    options:{...baseOpts, plugins:{...baseOpts.plugins, legend:{display:true, labels:{color:textColor,font:{size:11},boxWidth:12}}},
+      scales:{
+        x:{ ticks:{color:textColor,font:{size:10}}, grid:{color:gridColor} },
+        y:{ ticks:{color:textColor,font:{size:10},callback:v=>'$'+v.toLocaleString()}, grid:{color:gridColor} }
+      }
+    }
+  });
+}
+
+// ── Denial bars ───────────────────────────────────────────────────
+function renderDenialBars(d){
+  const denied = d.filter(r=>r.status==='denied' && r.denial);
+  const counts = {};
+  denied.forEach(r=>counts[r.denial]=(counts[r.denial]||0)+1);
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const max    = sorted.length ? sorted[0][1] : 1;
+  const colors = [COLORS.red,COLORS.amber,COLORS.purple,COLORS.teal,COLORS.blue];
+
+  document.getElementById('denialBars').innerHTML = sorted.map(([reason,count],i)=>`
+    <div class="bar-row">
+      <span class="bar-label" title="${reason}">${reason.length>20?reason.slice(0,18)+'…':reason}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${(count/max*100).toFixed(0)}%;background:${colors[i%colors.length]};"></div>
+      </div>
+      <span class="bar-val">${count}</span>
+    </div>`).join('');
+}
+
+// ── Plan table ────────────────────────────────────────────────────
+function renderPlanTable(d){
+  const planMap={};
+  PLANS.forEach(p=>planMap[p]={total:0,approved:0,denied:0,billed:[],paid:[]});
+  d.forEach(r=>{
+    if(planMap[r.plan]){
+      planMap[r.plan].total++;
+      if(r.status==='approved') planMap[r.plan].approved++;
+      if(r.status==='denied')   planMap[r.plan].denied++;
+      planMap[r.plan].billed.push(r.billed);
+      planMap[r.plan].paid.push(r.paid);
+    }
+  });
+
+  document.getElementById('planTableBody').innerHTML = PLANS.map(p=>{
+    const pm  = planMap[p];
+    const apr = pm.total ? (pm.approved/pm.total*100).toFixed(1) : '0.0';
+    const avgB= pm.billed.length ? Math.round(pm.billed.reduce((a,b)=>a+b,0)/pm.billed.length) : 0;
+    const avgP= pm.paid.length   ? Math.round(pm.paid.reduce((a,b)=>a+b,0)/pm.paid.length)     : 0;
+    const status = +apr>=75 ? '<span class="badge badge-green">On Track</span>'
+                 : +apr>=65 ? '<span class="badge badge-amber">Monitor</span>'
+                 :            '<span class="badge badge-red">At Risk</span>';
+    return `<tr>
+      <td><strong>${p}</strong></td>
+      <td>${pm.total.toLocaleString()}</td>
+      <td style="color:var(--green)">${pm.approved}</td>
+      <td style="color:var(--red)">${pm.denied}</td>
+      <td><span style="color:${+apr>=70?'var(--green)':+apr>=60?'var(--amber)':'var(--red)'};font-family:var(--mono)">${apr}%</span></td>
+      <td style="font-family:var(--mono)">$${avgB.toLocaleString()}</td>
+      <td style="font-family:var(--mono)">$${avgP.toLocaleString()}</td>
+      <td>${status}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+applyFilters();
+</script>
+</body>
+</html>
