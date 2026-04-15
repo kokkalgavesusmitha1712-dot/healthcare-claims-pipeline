@@ -1,1 +1,1 @@
-https://sushmitha-kokkalgave.github.io/healthcare-claims-pipeline/dashboards/healthcare_claims_dashboard.html
+https://kokkalgavesusmitha1712-dot.github.io/healthcare-claims-pipeline/healthcare_claims_dashboard.html
